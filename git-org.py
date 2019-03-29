@@ -16,7 +16,7 @@ def get_config():
     for _ in range(3):
         config_file_path = (this_dir / config_file_name).absolute()
         if config_file_path.exists():
-            config_handle = open(config_file_name, 'r')
+            config_handle = open(config_file_path, 'r')
             cfg = yaml.safe_load(config_handle)
             cfg['dir'] = config_file_path.parent
             return cfg
