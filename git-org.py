@@ -39,11 +39,13 @@ def repo_actions(repo: git.Repo):
 
 def setup_remotes(repo: git.Repo):
     """ Set up remotes as we would like. """
+    """ 
+    # FIXME: do we want to remove these? Maybe just have a black-list instead.  
     for remote in repo.remotes:  # Remove any remotes we don't want
         if remote.name not in config['remotes']:
             log(f'Removing Remote: {remote}')
             repo.delete_remote(remote)
-
+    """ 
     for remote_name in config['remotes']:  # Add or update remotes
         host = config['remotes'][remote_name]
         dirname = Path(repo.working_dir).name
