@@ -13,6 +13,11 @@ from typing import List, Mapping, Optional
 from pydantic.dataclasses import dataclass 
 
 
+def log(*args, **kwargs):
+    """ Wrapper for whatever type of logging we want to do. """
+    return print(*args, **kwargs)  # Thus far, the easy way!
+
+
 @dataclass
 class GitOrgConfig:
     """ GitOrgConfig 
@@ -24,26 +29,27 @@ class GitOrgConfig:
     skip: List[str]
     path: Path 
 
-
-def log(*args, **kwargs):
-    """ Wrapper for whatever type of logging we want to do. """
-    return print(*args, **kwargs)  # Thus far, the easy way!
-
-
-def get_config():
-    """ Look through a few levels of directory for a config YAML file. """
-    config_file_name = 'git-org.yaml'
-    orig_dir = this_dir = Path().absolute()
-    for _ in range(3):
-        config_file_path = (this_dir / config_file_name).absolute()
-        if config_file_path.exists():
-            config_handle = open(config_file_path, 'r')
+    @classmethod
+    def from_yaml(cls, path: Path):
+        with open(path, 'r') as config_handle:
             cfg = yaml.safe_load(config_handle)
-            cfg['path'] = config_file_path.parent
-            cfg = GitOrgConfig(**cfg)
-            return cfg
-        this_dir = this_dir.parent
-    raise FileNotFoundError(f'Could not find config starting in {str(orig_dir)}')
+        cfg['path'] = path.parent
+        return cls(**cfg)
+
+    @classmethod
+    def find(cls):
+        """ Look through a few levels of directory for a config YAML file. """
+        config_file_name = 'git-org.yaml'
+        orig_dir = this_dir = Path().absolute()
+        for _ in range(3):
+            config_file_path = (this_dir / config_file_name).absolute()
+            if config_file_path.exists():
+                return cls.from_yaml(config_file_path)
+            this_dir = this_dir.parent
+        raise FileNotFoundError(f'Could not find config starting in {str(orig_dir)}')
+
+
+config = GitOrgConfig.find()
 
 
 def remote_url(*, host: str, dirname: str):
@@ -86,7 +92,7 @@ def setup_remotes(repo: git.Repo):
 def push_remote(*, repo: git.Repo, remote: git.Remote):
     """ Push the active branch of `repo` to `remote`. """
     try:
-        remote.push(refspec=repo.active_branch.name)
+        remote.push(all=True) 
     except Exception as e:
         log(f'Error Pushing to {repo}')
         raise e
@@ -112,7 +118,7 @@ def is_repo(repo_dir: Path):
 
 def setup_repo_dir(repo_dir: Path):
     """ Set up the repository at `repo_dir`. 
-    Raises various exceptions, including if `repo_dir` is not a repository. """
+    Raises various exceptions, including if `repo_dir` is not a valid repository. """
     r = git.Repo(repo_dir)
     repo_actions(r)
 
@@ -130,10 +136,12 @@ def setup_git_org(org_dir: Path):
         lambda p: not (p / '.no-git-org').exists(),
     )
 
+    # Setup up lists of what worked and didnt
     passed = []
     failed = []
     skipped = []
 
+    # Now do the real work. Iterate over everything in `org_dir`. 
     for p in org_dir.iterdir():
         if not all([f(p) for f in filters]):
             skipped.append(p)
@@ -153,9 +161,6 @@ def setup_git_org(org_dir: Path):
     log("Skipped Directories:")
     [log(p) for p in skipped]
     
-
-config = get_config()
-
 
 if __name__ == '__main__':
     log(f'GitOrg Config: {config}')
